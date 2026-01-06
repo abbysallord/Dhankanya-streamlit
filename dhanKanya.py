@@ -170,12 +170,16 @@ def home_page(client):
 
     # Add voice input functionality
     st.write("You can ask questions in Hindi using your voice or type them in English.")
-    voice_input = st.button("🎙️ Use voice input")
-
-    if voice_input:
-        prompt = get_voice_input()
+    
+    # Get inputs from both sources
+    voice_prompt = get_voice_input()
+    chat_prompt = st.chat_input("Ask a question in English")
+    
+    # Prioritize voice input if available
+    if voice_prompt:
+        prompt = voice_prompt
     else:
-        prompt = st.chat_input("Ask a question in English")
+        prompt = chat_prompt
 
     if prompt:
         st.session_state.messages.append({"role": "user", "content": prompt})
