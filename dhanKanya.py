@@ -67,8 +67,8 @@ INTRODUCTION_PROMPTS = [
 def check_env_file():
     logger.info("=== Checking .env File ===")
     if not os.path.exists('.env'):
-        logger.error(".env file does not exist.")
-        raise FileNotFoundError(".env file is missing.")
+        logger.warning(".env file does not exist. Assuming secrets are set via environment variables.")
+        return
 
     with open('.env', 'r') as f:
         lines = f.readlines()
