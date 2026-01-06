@@ -1,5 +1,5 @@
 import streamlit as st
-import anthropic
+import google.generativeai as genai
 import pandas as pd
 import datetime
 import speech_recognition as sr
@@ -27,9 +27,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 CHROMA_PATH = 'chroma'
-ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY') # Get the API key from .env file using dotenv library
-if not ANTHROPIC_API_KEY:
-    raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+if not GOOGLE_API_KEY:
+    raise ValueError("GOOGLE_API_KEY not found in environment variables")
 
 PROMPT_TEMPLATE = """
 Answer the question so that it is easily understandable. The context is provided so that you can take reference from this. Please take inspiration from the context. You can also add things that you think are helpful for girls out there. Do not mention about the context provided. Answer as you usually answer.
@@ -86,7 +86,7 @@ def main():
     # Diagnostic logging
     logger.info("=== Starting Application Diagnostics ===")
     logger.info(f"Python version: {sys.version}")
-    logger.info(f"Anthropic package version: {anthropic.__version__}")
+    logger.info(f"Google Generative AI package version: {genai.__version__}")
     logger.info(f"Running on Streamlit version: {st.__version__}")
     
     # Log environment info
@@ -107,28 +107,18 @@ def main():
     menu = ["Start with Voice", "Build your Wealth", "Savings and Budgeting"]
     choice = st.sidebar.selectbox("Navigation", menu)
 
-    # Create the Anthropic client with extra error handling
+    # Create the Gemini client
     try:
-        logger.info("Attempting to create Anthropic client...")
+        logger.info("Attempting to configure Gemini...")
         
-        # Force disable any proxy settings
-        os.environ.pop('HTTP_PROXY', None)
-        os.environ.pop('HTTPS_PROXY', None)
-        os.environ.pop('http_proxy', None)
-        os.environ.pop('https_proxy', None)
+        genai.configure(api_key=GOOGLE_API_KEY)
+        client = genai.GenerativeModel('gemini-2.0-flash-001')
         
-        # Create client with minimal configuration
-        client_config = {
-            'api_key': ANTHROPIC_API_KEY
-        }
-        logger.info("Client configuration prepared (API key masked)")
-        
-        client = anthropic.Anthropic(**client_config)
-        logger.info("Successfully created Anthropic client")
-        st.sidebar.success("AI assistant initialized successfully!")
+        logger.info("Successfully created Gemini client")
+        st.sidebar.success("AI assistant (Gemini) initialized successfully!")
         
     except Exception as e:
-        logger.error("=== Anthropic Client Error ===")
+        logger.error("=== Gemini Client Error ===")
         logger.error(f"Error type: {type(e)}")
         logger.error(f"Error message: {str(e)}")
         logger.error(f"Error args: {e.args}")
@@ -418,20 +408,11 @@ def get_response(prompt, client):
         prompt_lower = prompt.lower()
         for pattern in INTRODUCTION_PROMPTS:
             if re.search(pattern, prompt_lower):
-                return "Namaste! I'm your financial assistant, developed by the Finance team at 100GIGA and powered by Anthropic's Claude AI model. My purpose is to provide you with expert financial guidance, enhancing your financial literacy and addressing your needs. Feel free to ask me anything related to finance, and I'll be here to assist you every step of the way."
+                return "Namaste! I'm your financial assistant, developed by the Finance team at 100GIGA and powered by Google's Gemini AI model. My purpose is to provide you with expert financial guidance, enhancing your financial literacy and addressing your needs. Feel free to ask me anything related to finance, and I'll be here to assist you every step of the way."
         
-        # Updated message creation syntax for anthropic v0.42.0
-        message = client.messages.create(
-            model=st.session_state["claude_model"],
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            max_tokens=600
-        )
-        return message.content[0].text
+        # Call Gemini API
+        response = client.generate_content(prompt)
+        return response.text
 
     except Exception as e:
         logger.error(f"Error getting response from Claude: {e}")
