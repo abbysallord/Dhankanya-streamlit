@@ -1,11 +1,13 @@
 import streamlit as st
 import google.generativeai as genai
+from streamlit_mic_recorder import mic_recorder
 import pandas as pd
 import datetime
 import speech_recognition as sr
 import re 
 import os
 import logging
+import io
 
 import sys
 import traceback
@@ -337,40 +339,51 @@ def expense_tracker_page():
         st.info("No earnings or expenses recorded yet.")
 
 def get_voice_input():
-    r = sr.Recognizer()
+    st.write("Click the microphone to start recording:")
+    audio = mic_recorder(
+        start_prompt="🎙️ Start Recording",
+        stop_prompt="🛑 Stop Recording",
+        just_once=True,
+        use_container_width=False,
+        key='voice_input'
+    )
 
-    with st.status("Click the button and start speaking...", expanded=True) as status: 
-        with sr.Microphone() as source:
-            status.update(label="🎙️ Listening...", state="running")  
-            st.write("Please speak now...") 
+    if audio:
+        status = st.status("Processing voice input...", expanded=True)
+        try:
+            audio_bytes = audio['bytes']
+            # Convert audio bytes to an AudioFile compatible format
+            audio_io = io.BytesIO(audio_bytes)
             
-            audio = r.listen(source)
-            status.update(label="⏳ Processing your voice...", state="running")  # Update status to processing
+            r = sr.Recognizer()
+            with sr.AudioFile(audio_io) as source:
+                audio_data = r.record(source)
 
+            status.write("Transcribing audio...")
+            
+            # Try English first, then Hindi
+            recognized_text = None
             try:
-                hindi_text = r.recognize_google(audio, language='hi-IN')
-                english_text = r.recognize_google(audio, language='en-IN')
-
-                if english_text:
-                    recognized_text = english_text
-                elif hindi_text:
-                    recognized_text = hindi_text
-                else:
-                    recognized_text = None
-
-                if recognized_text:
-                    status.update(label="✅ Voice input recognized!", state="complete")
-                    return recognized_text
-                else:
-                    status.update(label="❌ Could not recognize speech. Try again.", state="error")
-                    return None
-
+                recognized_text = r.recognize_google(audio_data, language='en-IN')
             except sr.UnknownValueError:
-                status.update(label="❌ Could not understand your voice. Please try again.", state="error")
+                try:
+                    recognized_text = r.recognize_google(audio_data, language='hi-IN')
+                except sr.UnknownValueError:
+                    pass
+
+            if recognized_text:
+                status.update(label="✅ Voice recognized!", state="complete")
+                return recognized_text
+            else:
+                status.update(label="❌ Could not understand audio.", state="error")
                 return None
-            except sr.RequestError as e:
-                status.update(label=f"⚠️ Could not connect to Google Speech API: {e}", state="error")
-                return None
+
+        except Exception as e:
+            status.update(label=f"❌ Error: {str(e)}", state="error")
+            return None
+    
+    return None
+
 
 def query(query_text, client):
     try:
